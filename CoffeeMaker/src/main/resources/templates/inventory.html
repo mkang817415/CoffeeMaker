@@ -1,0 +1,200 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+<title>Inventory</title>
+<link rel="stylesheet" href="css/bootstrap.css" />
+<link rel="stylesheet" href="css/app.css" />
+<style>
+input.ng-valid {
+	background-color: lightgreen;
+}
+
+input.ng-dirty.ng-invalid-required,input.ng-dirty.ng-invalid-number {
+	background-color: red;
+}
+
+input.ng-dirty.ng-invalid-min {
+	background-color: yellow;
+}
+
+
+</style>
+<script
+	src="https://tildesites.bowdoin.edu/~k.preslermarshall/AngularJS/angular.min.js"></script>
+</head>
+
+<body>
+
+
+	<script>
+		/*<![CDATA[*/
+		var app = angular.module('myApp', []);
+		app.controller('inventoryCtrl', function($scope, $http, $q) {
+			
+
+
+			$scope.getInventory = function() {
+
+				$http.get("/api/v1/inventory").then(function(response) {
+
+					// The reason for scope.inventory and scope.addInventory is for two reasons. 
+					// The first reason is to display the current inventory on the page.
+					// The second reason is to update the inventory with the new amount of ingredients, 
+					// When the user is updating the inventory, all ingredients in the inventory have a 
+					// default amount of 0 in the input field, so the user can update the amount of ingredients.
+					// It would have been confusing to use the same object for both purposes, so I created two objects.
+					// If the number of units currently in the inventory is displayed in the input field, the user
+					// May be confused on what to enter in the input field and may enter the wrong value.
+
+					$scope.inventory = response.data;
+
+					$scope.addInventory = {
+						ingredients : []
+					};
+
+					for (let ingredient of $scope.inventory.ingredients) {
+						$scope.addInventory.ingredients.push({
+							name : ingredient.name,
+							amount : 0
+						});
+					}
+
+					console.log($scope.inventory);
+					console.log($scope.addInventory); 
+				}, function(rejection) {
+					console.error("Error while getting Inventory");
+				})
+			}
+			
+
+			// When calling the post api endpoint, there was a delay on rendering after the post request was made.
+			// I used promises to make sure that the post request was made before the page was rendered.
+			// I used $q.all to make sure that all the promises were resolved before the page was rendered.
+			// The link below is a stack overflow discussion post that helped me write the promise code and 
+			// $q.all code. 
+			// https://stackoverflow.com/questions/43495864/can-anyone-explain-the-use-of-q-service-in-angularjs
+			$scope.updateInventory = function() {
+				$scope.success = false;
+				$scope.failure = false;
+		
+				let promises = [];
+		
+				for (let ingredient of $scope.addInventory.ingredients) {
+
+					// The reason for this post request is to update the inventory with the new amount of ingredients.
+					// Our API endpoint implementation does not have a post/put request to update the inventory.
+					// The updates to the ingredient and inventory database are both done in the post request in 
+					// the ingredients controller.
+
+					let promise = $http.post("/api/v1/ingredients", ingredient).then(
+						function(response) {
+							console.log("Successfully updated Inventory!")
+						}, function(rejection) {
+							$scope.failure = true;
+							$scope.success = false;
+							console.error("Error while updating Inventory!");
+						}
+					);
+		
+					promises.push(promise);
+				}
+		
+				$q.all(promises).then(function() {
+					$scope.success = !($scope.failure);
+					$scope.getInventory();
+				});
+			}
+
+			$scope.submit = function() {
+				$scope.updateInventory();
+				$scope.reset();
+			}
+
+			$scope.reset = function() {
+				$scope.getInventory();
+
+				$scope.success = false;
+				$scope.failure = false;
+				if (undefined != $scope.addInventoryForm) {
+					$scope.addInventoryForm.$setPristine(); //reset Form
+				}
+			}
+
+			$scope.reset();
+
+		});
+		/*]]>*/
+	</script>
+
+
+
+	<div class="generic-container ng-cloak" ng-app="myApp"
+		ng-controller="inventoryCtrl as ctrl">
+		<div class="panel panel-default">
+			<div class="panel-heading">
+				<span class="lead">View Inventory</span>
+			</div>
+
+			<div ng-repeat="ingredient in inventory.ingredients">
+                {{ ingredient.name }}: {{ ingredient.amount }}<br />
+            </div>
+
+			<div class="panel-heading">
+				<span class="lead">Update Inventory Form </span>
+			</div>
+			<div class="formcontainer">
+				<form ng-submit="submit()" name="addInventoryForm"
+					class="form-horizontal">
+
+					<div ng-repeat="ingredient in addInventory.ingredients track by $index">
+						<div class="row">
+							<div class="form-group col-md-12" >
+                                <label class = "col-md-2 control-lable" for="file">{{ingredient.name}}</label>
+                                <div class="col-md-7">
+                                    <input type="number" ng-model="ingredient.amount" name="{{ingredient.name}}"
+                                           class="{{ingredient.name}} form-control input-sm"
+                                           placeholder="Enter amount of {{ingredient.name}}" required="1" min="0"/>
+                                           <div class="has-error" ng-show="addInventoryForm.$dirty">
+
+                                        <span ng-show="addInventoryForm.ingredient.name.$error.required">This
+                                            is a required field
+										</span> 
+
+										<span ng-show="addInventoryForm.ingredient.name.$error.min">
+											Minimum amount is 0
+										</span> 
+
+										<span ng-show="addInventoryForm.ingredient.name.$invalid">">
+											This field is invalid 
+										</span>
+
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+					<div class="row">
+						<div class="form-actions floatRight">
+							<input type="submit" value="Submit"
+								class="btn btn-primary btn-sm"
+								ng-disabled="addInventoryForm.$invalid" />
+							<button type="button" ng-click="reset()"
+								class="btn btn-warning btn-sm"
+								ng-disabled="addInventoryForm.$pristine">Reset Form</button>
+						</div>
+					</div>
+				</form>
+			</div>
+			<div ng-show="success">Inventory Successfully Updated</div>
+			<div ng-show="failure">Error while updating inventory.</div>
+		</div>
+
+		<li><a href="/index">Home</a></li>
+		<li><a href="/addingredient.html">Add Ingredient</a></li>
+	</div>
+
+
+
+</body>
+</html>

@@ -1,0 +1,253 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+<title>Edit Recipe</title>
+<style>
+input.ng-valid {
+	background-color: lightgreen;
+}
+
+input.ng-dirty.ng-invalid-required,input.ng-dirty.ng-invalid-number {
+	background-color: red;
+}
+
+input.ng-dirty.ng-invalid-min {
+	background-color: yellow;
+}
+
+
+</style>
+<link rel="stylesheet" href="css/bootstrap.css" />
+<link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+	<script
+		src="https://tildesites.bowdoin.edu/~k.preslermarshall/AngularJS/angular.min.js"></script>
+
+	<script>
+		/*<![CDATA[*/
+		var app = angular.module('myApp', []);
+		app.controller('editRecipeCtrl', function($scope, $http, $q) {
+
+			$scope.reset = function() {
+				$scope.getRecipes(); 
+				$scope.getInventory();
+
+				$scope.selectedRecipe = {
+					name : '',
+					price : '',
+					ingredients : []
+				};
+
+				if (undefined != $scope.addRecipeForm) {
+					$scope.addRecipeForm.$setPristine(); // reset Form
+				}
+			}
+
+			// The .then function in javascript is used to execute a function after a promise is resolved.
+			// I learned this from the geeksforgeeks website. 
+			// https://www.geeksforgeeks.org/why-we-use-then-method-in-javascript/
+			$scope.submit = function() {
+				$scope.updateRecipe().then(function(){
+					$scope.reset();
+				});
+			}
+
+			$scope.getRecipes = function(){
+				$http.get("/api/v1/recipes").then(function(response){
+					$scope.recipes = response.data;
+					console.log($scope.recipes);
+				}, function(rejection){
+					console.error("Error while getting recipes");
+				})
+			}
+
+			$scope.getInventory = function() {
+				$http.get("/api/v1/inventory").then(function(response) {
+					$scope.inventory = response.data;
+					console.log($scope.inventory);
+				}, function(rejection) {
+					console.error("Error while getting Inventory");
+				})
+			}
+
+			$scope.selectRecipe = function(recipe) {
+				$scope.selectedRecipe = recipe;
+				console.log($scope.selectedRecipe);
+			};
+
+			$scope.selectIngredient = function(ingredient){
+				if (!$scope.selectedRecipe.ingredients.some(i => i.name === ingredient.name)){
+					$scope.selectedRecipe.ingredients.push({name: ingredient.name, amount: 0});
+				}
+			}
+
+			$scope.removeIngredient = function(ingredientName) {
+				$scope.selectedRecipe.ingredients = $scope.selectedRecipe.ingredients.filter(function(ingredient) {
+					return ingredient.name !== ingredientName;
+				});
+			}
+
+			$scope.updateRecipe = function() {
+				$scope.success = false;
+				$scope.failure = false;
+
+				recipe = $scope.selectedRecipe;
+				$http.put("/api/v1/recipes/" + recipe.name, recipe).then(
+					function(success) {
+						$scope.success = true;
+						$scope.failure = false;
+
+					}, function(rejection) {
+						console.error("Error while editing recipe");
+					});
+
+				// The reason why I did not put the reset in the updateRecipe function is because I wanted to make sure that the
+				// put request was made before the page was set to the reset state. The function $scope.submit() allows for 
+				// The updateRecipe function to be completely finished then it resets the page. 
+			}
+
+			$scope.reset();
+
+		});
+		/*]]>*/
+	</script>
+
+
+
+	<div ng-app="myApp" class="generic-container ng-cloak"
+		ng-controller="editRecipeCtrl as ctrl">
+		<div class="panel panel-default">
+
+
+			<div class="panel-heading">
+				<span class="lead"> View Recipes </span>
+			</div>
+
+			<div ng-repeat="recipe in recipes">
+				{{recipe.name}} 
+				<button ng-click="selectRecipe(recipe)"
+					class="btn btn-primary btn-sm">Edit Recipe</button>
+			</div>
+
+			<div class="panel-heading">
+				<span class="lead"> View Ingredients </span>
+			</div>
+
+			<div ng-repeat="ingredient in inventory.ingredients">
+				{{ingredient.name}} 
+				<button ng-click="selectIngredient(ingredient)"
+					class="btn btn-primary btn-sm">Add to Recipe</button>
+			</div>
+
+			<div class="panel-heading">
+				<span class="lead">Edit Recipe Form </span>
+			</div>
+
+
+			<div class="formcontainer">
+				<form ng-submit="submit()" name="editRecipeForm"
+					class="form-horizontal">
+
+
+			
+					<div class="row">
+						<div class="form-group col-md-12">
+							<label class="col-md-2 control-lable" for="file">Name</label>
+							<div class="col-md-7">
+								<input type="text" ng-model="selectedRecipe.name" name="name"
+									class="name form-control input-sm"
+									placeholder="{{selectedRecipe.name}}" required="0" />
+								<div class="has-error" ng-show="editRecipeForm.$dirty">
+									<span ng-show="editRecipeForm.name.$error.required">This is a required field.
+									</span> 
+									
+									<span ng-show="editRecipeForm.name.$invalid">This field is
+										invalid.
+									</span>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<div class="row">
+						<div class="form-group col-md-12">
+							<label class="col-md-2 control-lable" for="file">Price</label>
+							<div class="col-md-7">
+								<input type="number" ng-model="selectedRecipe.price" name="price"
+									class="price form-control input-sm"
+									placeholder="{{selectedRecipe.price}}" required="0" min="0"/>
+								<div class="has-error" ng-show="editRecipeForm.$dirty">
+									<span ng-show="editRecipeForm.price.$error.required">This
+										is a required field
+									</span> 
+									<span
+										ng-show="editRecipeForm.price.$error.min">Minimum amount
+										is 0
+									</span> 
+									<span ng-show="editRecipeForm.price.$invalid">This
+										field is invalid 
+									</span>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<div ng-repeat="ingredient in selectedRecipe.ingredients track by $index">
+						<div class="row">
+							<div class="form-group col-md-12" >
+                                <label class = "col-md-2 control-lable" for="file">{{ingredient.name}}</label>
+                                <div class="col-md-7">
+
+                                    <input type="number" ng-model="ingredient.amount" name="{{ingredient.name}}"
+                                           class="{{ingredient.name}} form-control input-sm"
+                                           placeholder="Enter amount of {{ingredient.name}}" required="1" min="0"/>
+									
+								   <button ng-click="removeIngredient(ingredient.name)"
+										   class="btn btn-primary btn-sm">Delete from Recipe</button>
+									
+									<div class="has-error" ng-show="editRecipeForm.$dirty">
+
+                                        <span ng-show="editRecipeForm.ingredient.$error.required">This
+                                            is a required field
+										</span> 
+
+										<span ng-show="editRecipeForm.ingredient.$error.min">
+											Minimum amount is 0
+										</span> 
+
+										<span ng-show="editRecipeForm.ingredient.$invalid">
+											This field is invalid 
+										</span>
+
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+
+					<div class="row">
+						<div class="form-actions floatRight">
+							<input type="submit" value="Submit"
+								class="btn btn-primary btn-sm"
+								ng-disabled="editRecipeForm.$invalid" />
+							<button type="button" ng-click="reset()"
+								class="btn btn-warning btn-sm"
+								ng-disabled="editRecipeForm.$pristine">Reset Form</button>
+						</div>
+					</div>
+				</form>
+			</div>
+			<div ng-show="success">Recipe Edited</div>
+			<div ng-show="failure">Error while edit recipe.</div>
+		</div>
+
+		<li><a href="/index">Home</a></li>
+		<li><a href="/selectRecipe.html">Back</a></li>
+		<li><a href="/addingredient.html">Add an Ingredient</a></li>
+	</div>
+
+
+</body>
+</html>
